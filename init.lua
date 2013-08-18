@@ -23,7 +23,7 @@ local capi = {
     screen = screen
 }
 
-local clientData = {} -- table that holds the positions and sizes of floating clients
+local clientData = {s={},t={}} -- table that holds the positions and sizes of floating clients
 
 module("revelation")
 
@@ -48,6 +48,7 @@ config = {
 function selectfn(restore)
     return function(c)
         restore()
+        awful.screen.focus(c.screen)
         -- Pop to client tag
         awful.tag.viewonly(c:tags()[1], c.screen)
         -- Focus and raise
@@ -70,6 +71,12 @@ function match_clients(rule, clients, t)
                 awful.client.floating.set(c, false)
             end
 
+            if c.screen ~= capi.mouse.screen then 
+                clientData.s[c] = c.screen
+                clientData.t[c] = c:tags()
+                c.screen = capi.mouse.screen
+            end
+            
             awful.client.toggletag(t, c)
             c.minimized = false
         end
@@ -125,18 +132,20 @@ function expose(rule, s)
                             scr,
                             awful.layout.suit.fair)[1]
     awful.tag.viewonly(t, t.screen)
-    match_clients(rule, capi.client.get(scr), t)
+    match_clients(rule, capi.client.get(), t)
     local function restore()
         awful.tag.history.restore()
         t.screen = nil
         capi.keygrabber.stop()
         capi.mousegrabber.stop()
+        t.activated = false
 
-        for _, c in pairs(capi.client.get(src)) do
+        for _, c in pairs(capi.client.get()) do
             if clientData[c] then
                 c:geometry(clientData[c]) -- Restore positions and sizes
                 awful.client.floating.set(c, true)
             end
+            if clientData.s[c] then c.screen = clientData.s[c] c:tags(clientData.t[c]) end
         end
     end
 
