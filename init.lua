@@ -23,11 +23,11 @@ local capi = {
     screen = screen
 }
 
-local clientData = {s={},t={}} -- table that holds the positions and sizes of floating clients
+local clientData = {s={},t={},g={},m={}} -- table that holds the positions and sizes of floating clients
 
-module("revelation")
+local revelation = {}
 
-config = {
+revelation.config = {
     -- Name of expose tag.
     tag_name = "Revelation",
 
@@ -62,12 +62,12 @@ end
 -- @param clients A table of clients to check.
 -- @param t The tag to give matching clients.
 function match_clients(rule, clients, t)
-    local mf = rule.any and config.match.any or config.match.exact
+    local mf = rule.any and revelation.config.match.any or revelation.config.match.exact
     for _, c in pairs(clients) do
         if mf(c, rule) then
             -- Store geometry before setting their tags
             if awful.client.floating.get(c) then
-                clientData[c] = c:geometry()
+                clientData.g[c] = c:geometry()
                 awful.client.floating.set(c, false)
             end
 
@@ -78,6 +78,7 @@ function match_clients(rule, clients, t)
             end
             
             awful.client.toggletag(t, c)
+            clientData.m[c] = c.minimized
             c.minimized = false
         end
     end
@@ -111,6 +112,7 @@ function keyboardhandler (restore)
             return false
         elseif key == "Return" then
             selectfn(restore)(capi.client.focus)
+            c.minimized = false
             return false
         elseif key == "Left" or key == "Right" or
             key == "Up" or key == "Down" then
@@ -128,7 +130,7 @@ function expose(rule, s)
     local rule = rule or {class=""}
     local scr = s or capi.mouse.screen
 
-    local t = awful.tag.new({config.tag_name},
+    local t = awful.tag.new({revelation.config.tag_name},
                             scr,
                             awful.layout.suit.fair)[1]
     awful.tag.viewonly(t, t.screen)
@@ -141,11 +143,12 @@ function expose(rule, s)
         t.activated = false
 
         for _, c in pairs(capi.client.get()) do
-            if clientData[c] then
-                c:geometry(clientData[c]) -- Restore positions and sizes
-                awful.client.floating.set(c, true)
-            end
             if clientData.s[c] then c.screen = clientData.s[c] c:tags(clientData.t[c]) end
+            if clientData.m[c] then c.minimized = clientData.m[c] end
+            if clientData.g[c] then
+                awful.client.floating.set(c, true)
+                c:geometry(clientData.g[c]) -- Restore positions and sizes
+            end
         end
     end
 
@@ -157,6 +160,7 @@ function expose(rule, s)
         local c = awful.mouse.client_under_pointer()
         if mouse.buttons[1] == true then
             selectfn(restore)(c)
+            c.minimized = false
             return false
         elseif mouse.buttons[2] == true and pressedMiddle == false and c ~= nil then -- is true whenever the button is down. 
             pressedMiddle = true -- extra variable needed to prevent script from spam-closing windows
@@ -173,4 +177,4 @@ function expose(rule, s)
     end,"fleur")
 end
 
-setmetatable(_M, { __call = function(_, ...) return expose(...) end })
+return setmetatable(revelation, { __call = function(_, ...) return expose(...) end })
